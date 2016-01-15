@@ -32,6 +32,7 @@
 package org.atmosphere.container;
 
 import org.apache.catalina.connector.RequestFacade;
+import org.apache.catalina.connector.Request;
 import org.apache.catalina.websocket.StreamInbound;
 import org.atmosphere.cpr.Action;
 import org.atmosphere.cpr.ApplicationConfig;
@@ -138,7 +139,6 @@ public class TomcatWebSocketUtil {
             while (hsr instanceof HttpServletRequestWrapper)
                 hsr = (HttpServletRequest) ((HttpServletRequestWrapper) hsr).getRequest();
 
-            RequestFacade facade = (RequestFacade) hsr;
             boolean isDestroyable = false;
             s = config.getInitParameter(ApplicationConfig.RECYCLE_ATMOSPHERE_REQUEST_RESPONSE);
             if (s != null && Boolean.valueOf(s)) {
@@ -146,7 +146,16 @@ public class TomcatWebSocketUtil {
             }
             StreamInbound inbound = new TomcatWebSocketHandler(AtmosphereRequest.cloneRequest(req, true, useBuildInSession, isDestroyable),
                     config.framework(), webSocketProcessor);
-            facade.doUpgrade(inbound);
+            
+            if(hsr instanceof RequestFacade){        
+                RequestFacade facade = (RequestFacade) hsr;
+                facade.doUpgrade(inbound);
+            } else if (hsr instanceof Request){
+                /*When you're using Atmosphere in a clustered environment managed by terracotta, it modifies the original
+                HttpServletRequest object so the implementation changes from RequestFacade to Request.*/
+                Request r = (Request)hsr;
+                r.doUpgrade(inbound);
+            }
             return new Action(Action.TYPE.CREATED);
         }
 
